@@ -1,14 +1,20 @@
 const fs = require('fs');
 const path = require('path');
 const { google } = require('googleapis');
+const archiver = require('archiver');
 
 const zipAndUpload = async (directories, parentFolderId, googleDriveApiKey) => {
-  for (const directory of directories) {
-    const zipFileName = `${getFolderName(directory)}.zip`;
-    await zipDirectory(directory, zipFileName);
-    const fileId = await uploadFile(zipFileName, parentFolderId, googleDriveApiKey);
-    const downloadLink = generateDownloadLink(fileId);
-    await updateTemplatesJson(zipFileName, downloadLink);
+  try {
+    for (const directory of directories) {
+      const zipFileName = `${getFolderName(directory)}.zip`;
+      await zipDirectory(directory, zipFileName);
+      const fileId = await uploadFile(zipFileName, parentFolderId, googleDriveApiKey);
+      const downloadLink = generateDownloadLink(fileId);
+      await updateTemplatesJson(zipFileName, downloadLink);
+    }
+  } catch (error) {
+    console.error('Error:', error.message);
+    process.exit(1);
   }
 };
 
@@ -20,7 +26,6 @@ const getFolderName = (directory) => {
 
 const zipDirectory = (directory, zipFileName) => {
   return new Promise((resolve, reject) => {
-    const archiver = require('archiver');
     const output = fs.createWriteStream(zipFileName);
     const archive = archiver('zip', { zlib: { level: 9 } });
 
@@ -34,25 +39,29 @@ const zipDirectory = (directory, zipFileName) => {
 };
 
 const uploadFile = async (filePath, parentFolderId, googleDriveApiKey) => {
-  const drive = google.drive({ version: 'v3' });
-  const media = {
-    mimeType: 'application/zip',
-    body: fs.createReadStream(filePath),
-  };
+  try {
+    const drive = google.drive({ version: 'v3' });
+    const media = {
+      mimeType: 'application/zip',
+      body: fs.createReadStream(filePath),
+    };
 
-  const fileMetadata = {
-    name: path.basename(filePath),
-    parents: [parentFolderId],
-  };
+    const fileMetadata = {
+      name: path.basename(filePath),
+      parents: [parentFolderId],
+    };
 
-  const { data } = await drive.files.create({
-    auth: googleDriveApiKey,
-    resource: fileMetadata,
-    media: media,
-    fields: 'id',
-  });
+    const response = await drive.files.create({
+      auth: googleDriveApiKey,
+      resource: fileMetadata,
+      media: media,
+      fields: 'id',
+    });
 
-  return data.id;
+    return response.data.id;
+  } catch (error) {
+    throw new Error(`Failed to upload file '${filePath}' to Google Drive: ${error.message}`);
+  }
 };
 
 const generateDownloadLink = (fileId) => {
@@ -60,17 +69,21 @@ const generateDownloadLink = (fileId) => {
 };
 
 const updateTemplatesJson = async (zipFileName, downloadLink) => {
-  const templatesPath = path.join(__dirname, '..', 'templates.json');
-  const templates = require(templatesPath);
+  try {
+    const templatesPath = path.join(__dirname, '..', 'templates.json');
+    const templates = require(templatesPath);
 
-  for (const template of templates) {
-    if (template.tname === getTemplateFromZipFileName(zipFileName)) {
-      template.turl = downloadLink;
-      break;
+    for (const template of templates) {
+      if (template.tname === getTemplateFromZipFileName(zipFileName)) {
+        template.turl = downloadLink;
+        break;
+      }
     }
-  }
 
-  fs.writeFileSync(templatesPath, JSON.stringify(templates, null, 2));
+    fs.writeFileSync(templatesPath, JSON.stringify(templates, null, 2));
+  } catch (error) {
+    throw new Error(`Failed to update 'templates.json': ${error.message}`);
+  }
 };
 
 const getTemplateFromZipFileName = (zipFileName) => {

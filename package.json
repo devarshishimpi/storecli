@@ -2,7 +2,7 @@
     "name": "zip-and-upload",
     "version": "1.0.0",
     "scripts": {
-      "install": "npm ci"
+      "install": "npm install"
     },
     "dependencies": {
       "archiver": "^5.3.0",

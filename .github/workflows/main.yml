@@ -23,6 +23,7 @@ jobs:
 
       - name: Run the script
         run: |
+          env;
           node upload-zip.js ${{ github.workspace }} ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }} ${{ secrets.GOOGLE_DRIVE_API_KEY }}
           exitCode=$?
           if [ $exitCode -ne 0 ]; then

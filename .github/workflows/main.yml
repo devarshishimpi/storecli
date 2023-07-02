@@ -1,0 +1,39 @@
+name: Zip and Upload to Google Drive
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+
+      - name: Install dependencies
+        run: npm install --prefix ${{ github.workspace }}
+
+      - name: Run the script
+        run: |
+          node upload-zip.js ${{ github.workspace }} ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }} ${{ secrets.GOOGLE_DRIVE_API_KEY }}
+          exitCode=$?
+          if [ $exitCode -ne 0 ]; then
+            echo "::error::Script execution failed with exit code $exitCode"
+            exit $exitCode
+          fi
+
+      - name: Commit templates.json
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add templates.json
+          git commit -m "Update templates.json" --author="GitHub Actions <actions@github.com>"
+          git push

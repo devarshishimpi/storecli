@@ -2,19 +2,20 @@ const fs = require('fs');
 const path = require('path');
 const { google } = require('googleapis');
 
-const zipAndUpload = async (directory, parentFolderId, googleDriveApiKey) => {
-  // Create a zip file with the directory name
-  const zipFileName = `${path.basename(directory)}.zip`;
-  await zipDirectory(directory, zipFileName);
+const zipAndUpload = async (directories, parentFolderId, googleDriveApiKey) => {
+  for (const directory of directories) {
+    const zipFileName = `${getFolderName(directory)}.zip`;
+    await zipDirectory(directory, zipFileName);
+    const fileId = await uploadFile(zipFileName, parentFolderId, googleDriveApiKey);
+    const downloadLink = generateDownloadLink(fileId);
+    await updateTemplatesJson(zipFileName, downloadLink);
+  }
+};
 
-  // Upload the zip file to Google Drive
-  const fileId = await uploadFile(zipFileName, parentFolderId, googleDriveApiKey);
-
-  // Generate the download link
-  const downloadLink = generateDownloadLink(fileId);
-
-  // Update the templates.json file
-  await updateTemplatesJson(zipFileName, downloadLink);
+const getFolderName = (directory) => {
+  const folderName = path.basename(directory);
+  const parentDir = path.dirname(directory);
+  return parentDir !== '.' ? `${getFolderName(parentDir)}-${folderName}` : folderName;
 };
 
 const zipDirectory = (directory, zipFileName) => {
@@ -59,17 +60,37 @@ const generateDownloadLink = (fileId) => {
 };
 
 const updateTemplatesJson = async (zipFileName, downloadLink) => {
-  const templatesJsonPath = path.join(__dirname, '..', 'templates.json');
-  const templates = require(templatesJsonPath);
+  const templatesPath = path.join(__dirname, '..', 'templates.json');
+  const templates = require(templatesPath);
 
-  const updatedTemplates = templates.map((template) => {
-    if (template.tname === path.basename(zipFileName, '.zip')) {
+  for (const template of templates) {
+    if (template.tname === getTemplateFromZipFileName(zipFileName)) {
       template.turl = downloadLink;
+      break;
     }
-    return template;
-  });
+  }
 
-  fs.writeFileSync(templatesJsonPath, JSON.stringify(updatedTemplates, null, 2));
+  fs.writeFileSync(templatesPath, JSON.stringify(templates, null, 2));
 };
 
-module.exports = zipAndUpload;
+const getTemplateFromZipFileName = (zipFileName) => {
+  return zipFileName.replace('.zip', '');
+};
+
+const main = async () => {
+  try {
+    const workspace = process.argv[2];
+    const parentFolderId = process.argv[3];
+    const googleDriveApiKey = process.argv[4];
+
+    const directoriesPath = path.join(workspace, 'directories.json');
+    const directories = require(directoriesPath);
+
+    await zipAndUpload(directories, parentFolderId, googleDriveApiKey);
+  } catch (error) {
+    console.error('Error:', error.message);
+    process.exit(1);
+  }
+};
+
+main();

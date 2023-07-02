@@ -3,12 +3,22 @@ const path = require('path');
 const { google } = require('googleapis');
 const archiver = require('archiver');
 
-const zipAndUpload = async (directories, parentFolderId, googleDriveApiKey) => {
+const zipAndUpload = async (directories, parentFolderId, privateKey, clientEmail) => {
   try {
+    const auth = new google.auth.GoogleAuth({
+      credentials: {
+        private_key: privateKey,
+        client_email: clientEmail
+      },
+      scopes: ['https://www.googleapis.com/auth/drive.file']
+    });
+
+    const drive = google.drive({ version: 'v3', auth });
+
     for (const directory of directories) {
       const zipFileName = `${getFolderName(directory)}.zip`;
       await zipDirectory(directory, zipFileName);
-      const fileId = await uploadFile(zipFileName, parentFolderId, googleDriveApiKey);
+      const fileId = await uploadFile(drive, zipFileName, parentFolderId);
       const downloadLink = generateDownloadLink(fileId);
       await updateTemplatesJson(zipFileName, downloadLink);
     }
@@ -38,9 +48,8 @@ const zipDirectory = (directory, zipFileName) => {
   });
 };
 
-const uploadFile = async (filePath, parentFolderId, googleDriveApiKey) => {
+const uploadFile = async (drive, filePath, parentFolderId) => {
   try {
-    const drive = google.drive({ version: 'v3' });
     const media = {
       mimeType: 'application/zip',
       body: fs.createReadStream(filePath),
@@ -52,7 +61,6 @@ const uploadFile = async (filePath, parentFolderId, googleDriveApiKey) => {
     };
 
     const response = await drive.files.create({
-      auth: googleDriveApiKey,
       resource: fileMetadata,
       media: media,
       fields: 'id',
@@ -94,12 +102,13 @@ const main = async () => {
   try {
     const workspace = process.argv[2];
     const parentFolderId = process.argv[3];
-    const googleDriveApiKey = process.argv[4];
+    const clientEmail = process.argv[4];
+    const privateKey = process.argv[5];
 
     const directoriesPath = path.join(workspace, 'directories.json');
     const directories = require(directoriesPath);
 
-    await zipAndUpload(directories, parentFolderId, googleDriveApiKey);
+    await zipAndUpload(directories, parentFolderId, privateKey, clientEmail);
   } catch (error) {
     console.error('Error:', error.message);
     process.exit(1);

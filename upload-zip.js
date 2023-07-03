@@ -3,7 +3,7 @@ const path = require('path');
 const { google } = require('googleapis');
 const archiver = require('archiver');
 
-const zipAndUpload = async (directories, parentFolderId, privateKey, clientEmail) => {
+const zipAndUpload = async (directories, parentFolderId, clientEmail, privateKey) => {
   try {
     const auth = new google.auth.GoogleAuth({
       credentials: {
@@ -108,7 +108,7 @@ const main = async () => {
     const directoriesPath = path.join(workspace, 'directories.json');
     const directories = require(directoriesPath);
 
-    await zipAndUpload(directories, parentFolderId, privateKey, clientEmail);
+    await zipAndUpload(directories, parentFolderId, clientEmail, privateKey);
   } catch (error) {
     console.error('Error:', error.message);
     process.exit(1);

@@ -50,3 +50,4 @@ jobs:
           git add templates.json
           git commit -m "Update templates.json" --author="GitHub Actions <actions@github.com>"
           git push
+          ls

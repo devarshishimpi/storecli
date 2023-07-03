@@ -33,13 +33,15 @@ jobs:
           GOOGLE_CLIENT_EMAIL: ${{ secrets.GOOGLE_CLIENT_EMAIL }}
           GOOGLE_PRIVATE_KEY: ${{ secrets.GOOGLE_PRIVATE_KEY }}
         run: |
-          env;
           node upload-zip.js ${{ github.workspace }} ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }} ${{ secrets.GOOGLE_CLIENT_EMAIL }} "$GOOGLE_PRIVATE_KEY"
           exitCode=$?
           if [ $exitCode -ne 0 ]; then
             echo "::error::Script execution failed with exit code $exitCode"
             exit $exitCode
           fi
+
+      - name: List content
+        run: ls
 
       - name: Commit templates.json
         run: |
